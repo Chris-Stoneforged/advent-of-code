@@ -32,16 +32,16 @@ struct CircularQueue* new_queue(unsigned int size, size_t esize) {
 	return q;
 }
 
-bool is_empty(const struct CircularQueue *q) {
+bool queue_is_empty(const struct CircularQueue *q) {
 	return q->front == q->back;
 }
 
-bool is_full(const struct CircularQueue *q) {
+bool queue_is_full(const struct CircularQueue *q) {
 	return q->back - q->front == q->mask + 1;
 }
 
 bool enqueue(struct CircularQueue *q, void *item) {
-	if (is_full(q)) {
+	if (queue_is_full(q)) {
 		printf("Cannot enqueue, queue is full\n");
 		return false;
 	}
@@ -54,7 +54,7 @@ bool enqueue(struct CircularQueue *q, void *item) {
 }
 
 bool dequeue(struct CircularQueue *q, void *result) {
-	if (is_empty(q)) {
+	if (queue_is_empty(q)) {
 		printf("Cannot dequeue from empty queue\n");
 		return false;
 	}
@@ -65,4 +65,9 @@ bool dequeue(struct CircularQueue *q, void *result) {
 	memcpy(result, (char *)q->array + off, q->esize);
 	q->front++;
 	return true;
+}
+
+void free_queue(struct CircularQueue* q) {
+	free(q->array);
+	free(q);
 }

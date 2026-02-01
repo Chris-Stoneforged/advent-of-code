@@ -83,7 +83,7 @@ int main(int argc, char** argv) {
 	}
 
 	struct Instruction i; 
-	while (!is_empty(q)) {
+	while (!queue_is_empty(q)) {
 		dequeue(q, &i);
 		give_to_bot(bots, outputs, i.bot, i.value);
 	}
