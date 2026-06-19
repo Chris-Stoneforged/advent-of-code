@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <limits.h>
+#include "../utils/circular_queue.h"
 #include "../utils/list.h"
 
 #define START_X 1
@@ -11,7 +12,6 @@
 
 struct Position {
 	int x, y, moves;
-	bool open;
 };
 
 int get_binary_ones(int i) {
@@ -32,118 +32,76 @@ bool is_valid_space(int x, int y) {
 	return x > 0 && y > 0 && !is_wall(x, y);
 }
 
-int distance_to_goal(struct Position* pos) {
-	int dx = abs(GOAL_X - pos->x);
-	int dy = abs(GOAL_Y - pos->y);
-	return (dx * dx) + (dy * dy);
-}
-
-struct Position* get_closest_position(struct List* l) {
-	struct Position* closest_pos, *current_pos;
-	int shortest_dist = INT_MAX;
-	for (int i = 0; i < l->len; ++i) {
-		get_at(l, i, &current_pos);
-		if (!current_pos->open) continue;
-		int dist = distance_to_goal(current_pos);
-		if (dist < shortest_dist) {
-			shortest_dist = dist;
-			closest_pos = current_pos; 
-		}
+bool has_been_visited(struct List* visited, int x, int y) {
+	struct Position p;
+	for (int i = 0; i < visited->len; ++i) {
+		get_at(visited, i, &p);
+		if (p.x == x && p.y == y) return true;
 	}
-
-	return closest_pos;
-}
-
-struct Position* position_with_xy(struct List* positions, const int x, const int y) {
-	struct Position* pos;
-	for (int i = 0; i < positions->len; ++i) {
-		get_at(positions, i, &pos);
-		if (pos->x == x && pos->y == y) return pos;
-	}
-	return NULL;
-}
-
-void add_position_to_list(struct List* positions, int x, int y, int moves) {
-	if (!is_valid_space(x, y)) {
-		return;
-	}
-
-	struct Position* existing = position_with_xy(positions, x, y);
-	if (existing != NULL) {
-		return;
-	}
-
-	struct Position* p = malloc(sizeof(struct Position));
-	if (!p) {
-		printf("Error allocating position");
-		return;
-	}
-
-	p->x = x; p->y = y; p->moves = moves; p->open = true;
-	append(positions, &p);
-}
-
-bool evaluate_next_position(struct List* l) {
-	struct Position* pos = get_closest_position(l);
-	if (pos->x == GOAL_X && pos->y == GOAL_Y) {
-		printf("Reached the goal in %d moves\n", pos->moves);
-		return true;
-	}
-
-	printf("Evaluating position (%d, %d)\n", pos->x, pos->y);
-
-	int xl = pos->x - 1, xr = pos->x + 1;
-	int yu = pos->y - 1, yd = pos->y + 1;
-
-	add_position_to_list(l, xl, pos->y, pos->moves + 1);
-	add_position_to_list(l, xr, pos->y, pos->moves + 1);
-	add_position_to_list(l, pos->x, yu, pos->moves + 1);
-	add_position_to_list(l, pos->x, yd, pos->moves + 1);
-
-	pos->open = false;
-
 	return false;
 }
 
-void print_map(struct List* positions) {
+void enqueue_neighbour(struct CircularQueue* q, struct List* visited, int x, int y, int moves) {
+	if (!is_valid_space(x, y)) return;
+	if (has_been_visited(visited, x, y)) return;
+
+	struct Position new_pos = { x, y, moves };
+	enqueue(q, &new_pos);
+}
+
+bool evaluate_next_position(struct CircularQueue* q, struct List* visited) {
+	struct Position next;
+	dequeue(q, &next);
+	if (next.x == GOAL_X && next.y == GOAL_Y) {
+		printf("Found goal in %d moves\n", next.moves);
+		return true;
+	}
+
+	int xl = next.x - 1, xr = next.x + 1;
+	int yu = next.y - 1, yd = next.y + 1;
+
+	enqueue_neighbour(q, visited, xl, next.y, next.moves + 1);
+	enqueue_neighbour(q, visited, xr, next.y, next.moves + 1);
+	enqueue_neighbour(q, visited, next.x, yu, next.moves + 1);
+	enqueue_neighbour(q, visited, next.x, yd, next.moves + 1);
+
+	append(visited, &next);
+	return false;
+}
+
+void print_map(struct List* visited) {
 	for (int i = 0; i < 50; ++i) {
 		for (int j = 0; j < 50; ++j) {
 			if (is_wall(j, i))
 				printf("X");
-			else {
-				struct Position* pos = position_with_xy(positions, j, i);
-				if (pos == NULL)
-					printf(" ");
-				else
-					printf("O");
-			}
+			else if (has_been_visited(visited, j, i))
+				printf("O");
+			else
+				printf(" ");
 		}
 		printf("\n");
 	}
 }
 
 int main(int argc, char** argv) {
-	struct List* positions = new_list(1000, sizeof(struct Position*)); 
-	if (!positions) {
-		printf("List creation failed!\n");
-		return 0;
+	struct List* visited = new_list(4096, sizeof(struct Position)); 
+	if (!visited) {
+		printf("Failed to create visited list\n");
+		return 1;
 	}
 
-	struct Position* initial = malloc(sizeof(struct Position));
-	initial->x = START_X; initial->y = START_Y; initial->moves = 0; initial->open = true;
-	append(positions, &initial);
-	print_map(positions);
-	while (!evaluate_next_position(positions)) {
-		print_map(positions);
-		getchar();
+	struct CircularQueue* q = new_queue(4096, sizeof(struct Position));
+	if (!q) {
+		printf("Failed to create queue\n");
+		return 1;
 	}
 
-	struct Position* pos;
-	for (int i = 0; i < positions->len; ++i) {
-		get_at(positions, i, &pos);
-		free(pos);
-	}
+	struct Position initial = { START_X, START_Y, 0 };
+	enqueue(q, &initial);
 
-	free_list(positions);
+	while (!evaluate_next_position(q, visited)) ;
+
+	free_queue(q);
+	free_list(visited);
 	return 0;
 }

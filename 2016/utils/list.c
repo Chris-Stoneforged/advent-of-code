@@ -45,7 +45,7 @@ bool append(struct List* l, const void* e) {
 
 bool get_at(struct List* l, unsigned int index, void* result) {
 	if (index >= l->len) {
-		printf("Index out of bounds");
+		printf("Index out of bounds\n");
 		return false;
 	}
 
@@ -57,4 +57,30 @@ bool get_at(struct List* l, unsigned int index, void* result) {
 void free_list(struct List* l) {
 	free(l->array);
 	free(l);
+}
+
+bool remove_at(struct List* l, unsigned int index) {
+	if (index >= l->len) return false;
+
+	--l->len;
+	if (index < l->len) {
+		unsigned int dst_off = index * l->esize;
+		unsigned int src_off = l->len * l->esize;
+		memcpy((char*)l->array + dst_off, (char*)l->array + src_off, l->esize);
+	}
+
+	return true;
+}
+
+bool remove_at_preserve_order(struct List* l, unsigned int index) {
+	if (index >= l->len) return false;
+
+	if (index < l->len) {
+		unsigned int dst_off = index * l->esize;
+		unsigned int src_off = (index + 1) * l->esize;
+		unsigned int len = (--l->len - index) * l->esize;
+		memmove((char*)l->array + dst_off, (char*)l->array + src_off, len);
+	}
+
+	return true;
 }

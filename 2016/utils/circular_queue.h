@@ -14,3 +14,4 @@ bool queue_is_empty(const struct CircularQueue *q);
 bool queue_is_full(const struct CircularQueue *q);
 bool enqueue(struct CircularQueue *q, void *item);
 bool dequeue(struct CircularQueue *q, void *result);
+void free_queue(struct CircularQueue* q);
